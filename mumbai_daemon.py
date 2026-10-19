@@ -140,33 +140,44 @@ def fetch_single_station_telemetry(st_meta):
         with urllib.request.urlopen(req, timeout=5) as res:
             d = json.loads(res.read().decode("utf-8"))
         st_detail = d.get("data", {}).get("station_detail", {})
-        st_avail = (st_detail.get("availability") or "").strip()
+        st_avail = (st_detail.get("availability") or "").strip().lower()
+        is_connected = st_detail.get("is_connected", True)
+        st_status = (st_detail.get("status") or "").strip().upper()
         plugin_details = st_detail.get("plugin_details", [])
 
         connectors = []
         port_idx = 1
 
         for p in plugin_details:
-            if p.get("status") == "DEACTIVATED":
-                continue
+            p_status = (p.get("status") or "").strip().upper()
             charger_name = p.get("charger_name") or f"Charger {port_idx}"
             cabinet_kw = float(p.get("power_rating") or 60.0)
             price = float(p.get("price") or 22.0)
             raw_conns = p.get("connectors", [])
 
             for c in raw_conns:
-                if c.get("is_active") is False:
-                    continue
                 err_msg = (c.get("error_message") or "").strip().lower()
                 c_avail = c.get("availability")
-                raw_c_status = (c.get("connector_status") or "available").upper()
+                raw_c_status = (c.get("connector_status") or "").strip().upper()
+                is_active = c.get("is_active", True)
 
-                if st_avail.lower() == "unavailable" or err_msg == "disconnected":
+                # Hyper-Strict 200% Fault & Health Evaluation
+                is_faulted = (
+                    not is_connected or
+                    not is_active or
+                    st_avail in ["unavailable", "closed", "maintenance", "offline"] or
+                    st_status in ["DEACTIVATED", "FAULTED", "INACTIVE", "OFFLINE"] or
+                    p_status in ["DEACTIVATED", "FAULTED", "INACTIVE", "OFFLINE", "MAINTENANCE"] or
+                    raw_c_status in ["FAULTED", "OFFLINE", "UNAVAILABLE", "SUSPENDEDEVSE", "SUSPENDEDEV", "DISCONNECTED", "ERROR"] or
+                    any(term in err_msg for term in ["fault", "error", "disconnect", "offline", "unavail", "trip", "disabled", "maintenance"])
+                )
+
+                if is_faulted:
                     c_status = "FAULTED"
-                elif c_avail is True:
-                    c_status = "FAULTED" if raw_c_status == "FAULTED" else "AVAILABLE"
-                elif raw_c_status in ["CHARGING", "INUSE", "BUSY"] or err_msg == "charging":
+                elif raw_c_status in ["CHARGING", "INUSE", "BUSY", "OCCUPIED"] or "charg" in err_msg:
                     c_status = "CHARGING"
+                elif (c_avail is True or c_avail == "true") and raw_c_status in ["AVAILABLE", "IDLE", "ONLINE", "READY"]:
+                    c_status = "AVAILABLE"
                 else:
                     c_status = "FAULTED"
 
