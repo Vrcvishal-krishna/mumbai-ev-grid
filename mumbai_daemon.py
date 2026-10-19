@@ -379,10 +379,10 @@ def poll_network_live(station_list):
         for t_st in tata_stations:
             LAST_KNOWN_STATIONS[t_st["id"]] = t_st
 
-    jio_stations = fetch_jiobp_stations()
-    if jio_stations:
-        for j_st in jio_stations:
-            LAST_KNOWN_STATIONS[j_st["id"]] = j_st
+    # Remove any unverified static feeds from cache
+    for k in list(LAST_KNOWN_STATIONS.keys()):
+        if str(k).startswith("JIO-") or str(k).startswith("CZ-"):
+            del LAST_KNOWN_STATIONS[k]
 
     snapshot_stations = list(LAST_KNOWN_STATIONS.values())
 
