@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: mumbai-ev-grid
+    env: python
+    buildCommand: ""
+    startCommand: python app.py
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: TZ
+        value: Asia/Kolkata
