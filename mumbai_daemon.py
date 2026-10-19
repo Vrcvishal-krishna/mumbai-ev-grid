@@ -394,10 +394,15 @@ def poll_network_live(station_list):
     except Exception as e:
         print(f"Jio-bp fetch error: {e}", file=sys.stderr)
 
-    # Remove any unverified static feeds from cache
-    for k in list(LAST_KNOWN_STATIONS.keys()):
-        if str(k).startswith("CZ-"):
-            del LAST_KNOWN_STATIONS[k]
+    # Fetch live official ChargeZone network in Mumbai MMR
+    try:
+        from chargezone_fetcher import fetch_chargezone_stations
+        cz_stations = fetch_chargezone_stations("mumbai", is_telemetry_running=True)
+        if cz_stations:
+            for c_st in cz_stations:
+                LAST_KNOWN_STATIONS[c_st["id"]] = c_st
+    except Exception as e:
+        print(f"ChargeZone fetch error: {e}", file=sys.stderr)
 
     snapshot_stations = list(LAST_KNOWN_STATIONS.values())
 
